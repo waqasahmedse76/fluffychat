@@ -1,5 +1,6 @@
+import 'package:adaptive_dialog/adaptive_dialog.dart';
 import 'package:flutter/material.dart';
-
+import 'package:future_loading_dialog/future_loading_dialog.dart';
 import 'package:flutter_gen/gen_l10n/l10n.dart';
 import 'package:flutter_linkify/flutter_linkify.dart';
 import 'package:go_router/go_router.dart';
@@ -59,7 +60,9 @@ class ChatDetailsView extends StatelessWidget {
                   tooltip: L10n.of(context)!.share,
                   icon: Icon(Icons.adaptive.share_outlined),
                   onPressed: () => FluffyShare.share(
-                    AppConfig.inviteLinkPrefix + room.canonicalAlias,
+                    L10n.of(context)!.youInvitedToBy(
+                      AppConfig.inviteLinkPrefix + room.canonicalAlias,
+                    ),
                     context,
                   ),
                 ),
@@ -219,18 +222,10 @@ class ChatDetailsView extends StatelessWidget {
                         else
                           Padding(
                             padding: const EdgeInsets.all(16.0),
-                            child: TextButton.icon(
+                            child: OutlinedButton.icon(
                               onPressed: controller.setTopicAction,
                               label: Text(L10n.of(context)!.setChatDescription),
                               icon: const Icon(Icons.edit_outlined),
-                              style: TextButton.styleFrom(
-                                backgroundColor: Theme.of(context)
-                                    .colorScheme
-                                    .secondaryContainer,
-                                foregroundColor: Theme.of(context)
-                                    .colorScheme
-                                    .onSecondaryContainer,
-                              ),
                             ),
                           ),
                         Padding(
@@ -265,6 +260,23 @@ class ChatDetailsView extends StatelessWidget {
                           height: 1,
                           color: Theme.of(context).dividerColor,
                         ),
+                        if (room.joinRules == JoinRules.public)
+                          ListTile(
+                            leading: CircleAvatar(
+                              backgroundColor:
+                                  Theme.of(context).scaffoldBackgroundColor,
+                              foregroundColor: iconColor,
+                              child: const Icon(Icons.link_outlined),
+                            ),
+                            trailing: const Icon(Icons.chevron_right_outlined),
+                            onTap: controller.editAliases,
+                            title: Text(L10n.of(context)!.editRoomAliases),
+                            subtitle: Text(
+                              (room.canonicalAlias.isNotEmpty)
+                                  ? room.canonicalAlias
+                                  : L10n.of(context)!.none,
+                            ),
+                          ),
                         ListTile(
                           leading: CircleAvatar(
                             backgroundColor:
@@ -274,12 +286,13 @@ class ChatDetailsView extends StatelessWidget {
                               Icons.insert_emoticon_outlined,
                             ),
                           ),
-                          title:
-                              Text(L10n.of(context)!.customEmojisAndStickers),
+                          title: Text(L10n.of(context)!.emoteSettings),
                           subtitle: Text(L10n.of(context)!.setCustomEmotes),
                           onTap: controller.goToEmoteSettings,
                           trailing: const Icon(Icons.chevron_right_outlined),
+                        
                         ),
+                        
                         if (!room.isDirectChat)
                           ListTile(
                             leading: CircleAvatar(
@@ -289,14 +302,69 @@ class ChatDetailsView extends StatelessWidget {
                               child: const Icon(Icons.shield_outlined),
                             ),
                             title: Text(
-                              L10n.of(context)!.accessAndVisibility,
+                              L10n.of(context)!.whoIsAllowedToJoinThisGroup,
+                            ),
+                            trailing: room.canChangeJoinRules
+                                ? const Icon(Icons.chevron_right_outlined)
+                                : null,
+                            subtitle: Text(
+                              room.joinRules?.getLocalizedString(
+                                    MatrixLocals(L10n.of(context)!),
+                                  ) ??
+                                  L10n.of(context)!.none,
+                            ),
+                            onTap: room.canChangeJoinRules
+                                ? controller.setJoinRules
+                                : null,
+                          ),
+                        if (!room.isDirectChat)
+                          ListTile(
+                            leading: CircleAvatar(
+                              backgroundColor:
+                                  Theme.of(context).scaffoldBackgroundColor,
+                              foregroundColor: iconColor,
+                              child: const Icon(Icons.visibility_outlined),
+                            ),
+                            trailing: room.canChangeHistoryVisibility
+                                ? const Icon(Icons.chevron_right_outlined)
+                                : null,
+                            title: Text(
+                              L10n.of(context)!.visibilityOfTheChatHistory,
                             ),
                             subtitle: Text(
-                              L10n.of(context)!.accessAndVisibilityDescription,
+                              room.historyVisibility?.getLocalizedString(
+                                    MatrixLocals(L10n.of(context)!),
+                                  ) ??
+                                  L10n.of(context)!.none,
                             ),
-                            onTap: () => context
-                                .push('/rooms/${room.id}/details/access'),
-                            trailing: const Icon(Icons.chevron_right_outlined),
+                            onTap: room.canChangeHistoryVisibility
+                                ? controller.setHistoryVisibility
+                                : null,
+                          ),
+                        if (room.joinRules == JoinRules.public)
+                          ListTile(
+                            leading: CircleAvatar(
+                              backgroundColor:
+                                  Theme.of(context).scaffoldBackgroundColor,
+                              foregroundColor: iconColor,
+                              child: const Icon(
+                                Icons.person_add_alt_1_outlined,
+                              ),
+                            ),
+                            trailing: room.canChangeGuestAccess
+                                ? const Icon(Icons.chevron_right_outlined)
+                                : null,
+                            title: Text(
+                              L10n.of(context)!.areGuestsAllowedToJoin,
+                            ),
+                            subtitle: Text(
+                              room.guestAccess.getLocalizedString(
+                                MatrixLocals(L10n.of(context)!),
+                              ),
+                            ),
+                            onTap: room.canChangeGuestAccess
+                                ? controller.setGuestAccess
+                                : null,
                           ),
                         if (!room.isDirectChat)
                           ListTile(
@@ -316,7 +384,39 @@ class ChatDetailsView extends StatelessWidget {
                             onTap: () => context
                                 .push('/rooms/${room.id}/details/permissions'),
                           ),
-                        Divider(
+                          if (!room.isDirectChat)
+                          ListTile(
+                            title: Text(L10n.of(context)!.archive),
+                            subtitle: Text(
+                              L10n.of(context)!.archiveRoomDescription,
+                            ),
+                            leading: CircleAvatar(
+                              backgroundColor:
+                                  Theme.of(context).scaffoldBackgroundColor,
+                              foregroundColor: iconColor,
+                              child: const Icon(
+                                Icons.edit_attributes_outlined,
+                              ),
+                            ),
+                            trailing: const Icon(Icons.chevron_right_outlined),
+                            onTap:  () async {
+                                  final confirmed = await showOkCancelAlertDialog(
+                                    useRootNavigator: false,
+                                    context: context,
+                                    title: L10n.of(context)!.areYouSure,
+                                    okLabel: L10n.of(context)!.yes,
+                                    cancelLabel: L10n.of(context)!.no,
+                                    message: L10n.of(context)!.archiveRoomDescription,
+                                  );
+                                  if (confirmed == OkCancelResult.cancel) return;
+                                  await showFutureLoadingDialog(
+                                    context: context,
+                                    future: () => room.leave(),
+                                  );
+                                },
+                              ),
+                          
+                           Divider(
                           height: 1,
                           color: Theme.of(context).dividerColor,
                         ),
@@ -335,18 +435,16 @@ class ChatDetailsView extends StatelessWidget {
                           ListTile(
                             title: Text(L10n.of(context)!.inviteContact),
                             leading: CircleAvatar(
-                              backgroundColor: Theme.of(context)
-                                  .colorScheme
-                                  .primaryContainer,
-                              foregroundColor: Theme.of(context)
-                                  .colorScheme
-                                  .onPrimaryContainer,
+                              backgroundColor:
+                                  Theme.of(context).colorScheme.primary,
+                              foregroundColor: Colors.white,
                               radius: Avatar.defaultSize / 2,
                               child: const Icon(Icons.add_outlined),
                             ),
                             trailing: const Icon(Icons.chevron_right_outlined),
                             onTap: () => context.go('/rooms/${room.id}/invite'),
                           ),
+                          
                       ],
                     )
                   : i < members.length + 1
